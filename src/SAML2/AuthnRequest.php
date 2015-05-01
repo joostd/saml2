@@ -103,6 +103,13 @@ class SAML2_AuthnRequest extends SAML2_Request
 
 
     /**
+     * NameID of the Subject to be authenticated.
+     *
+     * @var string|NULL
+     */
+    private $nameId;
+
+    /**
      * Constructor for SAML 2 authentication request messages.
      *
      * @param DOMElement|NULL $xml The input message.
@@ -137,6 +144,24 @@ class SAML2_AuthnRequest extends SAML2_Request
 
         if ($xml->hasAttribute('AssertionConsumerServiceIndex')) {
             $this->assertionConsumerServiceIndex = (int) $xml->getAttribute('AssertionConsumerServiceIndex');
+        }
+
+        $subject = SAML2_Utils::xpQuery($xml, './saml_assertion:Subject');
+
+        if (!empty($subject)) {
+            if (count($subject) > 1) {
+                throw new Exception('More than one <saml:Subject> in <samlp:AuthnRequest>.');
+            }
+            $subject = $subject[0];
+
+            $nameId = SAML2_Utils::xpQuery($subject, './saml_assertion:NameID');
+            if (empty($nameId)) {
+                throw new Exception('Missing <saml:NameID> in <saml:Subject>.');
+            } elseif (count($nameId) > 1) {
+                throw new Exception('More than one <saml:NameID> in <saml:Subject>.');
+            }
+            $nameId = $nameId[0];
+            $this->nameId = SAML2_Utils::parseNameId($nameId);
         }
 
         $nameIdPolicy = SAML2_Utils::xpQuery($xml, './saml_protocol:NameIDPolicy');
@@ -457,6 +482,16 @@ class SAML2_AuthnRequest extends SAML2_Request
         $this->requestedAuthnContext = $requestedAuthnContext;
     }
 
+    public function setNameId($nameId)
+    {
+        assert('is_string($nameId) || is_null($nameId)');
+        $this->nameId = $nameId;
+    }
+
+    public function getNameId()
+    {
+        return $this->nameId;
+    }
 
     /**
      * Convert this authentication request to an XML element.
